@@ -1,0 +1,77 @@
+services:
+  container-1:
+    build: .
+    image: service
+    environment:
+      - CONSUL_HTTP_ADDR=http://172.25.124.219:8500
+      - SERVICE_NAME=service-1
+    command: 
+      - /bin/sh
+      - -c 
+      - "/usr/local/bin/setup_ipsec.sh service-1 && exec tail -f /dev/null"
+    networks:
+      ipsec-net:
+        ipv4_address: 10.10.0.2
+    volumes:
+      - ./ipsec-container1.conf:/etc/ipsec.conf
+    cap_add:
+      - NET_ADMIN       # Required for IPSec network operations
+      - AUDIT_WRITE     # Needed for security auditing
+    sysctls:
+      - net.ipv4.conf.all.rp_filter=0  # Disable reverse path filtering
+      - net.ipv4.ip_forward=1          # Enable IP forwarding
+  container1-proxy:
+      container_name: container1-proxy
+      image: nicholasjackson/consul-envoy:1.15.4-v1.27.2
+      restart: always
+      environment:
+          CONSUL_HTTP_ADDR: 172.25.124.219:8500
+          CONSUL_GRPC_ADDR: 172.25.124.219:8502
+          SERVICE_CONFIG: /config/container1.hcl # to be checked because it has 2 services
+          CENTRAL_CONFIG_DIR: /central_config
+      volumes:
+          - "./Consul/service_config:/config"
+          - "./Consul/central_config:/central_config"
+      command: ["consul", "connect", "envoy","-sidecar-for", "container1", "--ignore-envoy-compatibility"]
+      network_mode: "service:container-1"
+  container-2:
+    build: .
+    image: service
+    environment:
+      - CONSUL_HTTP_ADDR=http://172.25.124.219:8500
+      - SERVICE_NAME=service-2
+    command: 
+      - /bin/sh
+      - -c
+      - "/usr/local/bin/setup_ipsec.sh service-2 && exec tail -f /dev/null"
+    networks:
+      ipsec-net:
+        ipv4_address: 10.10.0.3
+    volumes:
+      - ./ipsec-container2.conf:/etc/ipsec.conf  # Fixed extra quote
+    cap_add:
+      - NET_ADMIN
+      - AUDIT_WRITE
+    sysctls:
+      - net.ipv4.conf.all.rp_filter=0
+      - net.ipv4.ip_forward=1
+  container2-proxy:
+      container_name: container2-proxy
+      image: nicholasjackson/consul-envoy:1.15.4-v1.27.2
+      restart: always
+      environment:
+          CONSUL_HTTP_ADDR: 172.25.124.219:8500
+          CONSUL_GRPC_ADDR: 172.25.124.219:8502
+          SERVICE_CONFIG: /config/container2.hcl # to be checked because it has 2 services
+          CENTRAL_CONFIG_DIR: /central_config
+      volumes:
+          - "./Consul/service_config:/config"
+          - "./Consul/central_config:/central_config"
+      command: ["consul", "connect", "envoy","-sidecar-for", "container2", "--ignore-envoy-compatibility"]
+      network_mode: "service:container-2"
+networks:
+  ipsec-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.0.0/24
