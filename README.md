@@ -33,9 +33,4 @@ This setup involves two containers that securely communicate with each other ove
 - **Docker**: Containerized environment for running services
 - **Bash/Script**: Used for container startup logic
 
-## Setup:
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/<your-username>/consul-ipsec-connector.git
-   cd consul-ipsec-connector
